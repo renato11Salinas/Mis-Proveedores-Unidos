@@ -636,9 +636,9 @@ export function OrdenDetail() {
                           </div>
                         ))}
                       </div>
-                      <div className="mt-4 pt-4 border-t">
+                      <div className="mt-4 pt-4 border-t flex flex-col items-center text-center">
                         <p className="text-sm font-semibold text-gray-700 mb-3">Agregar más fotografías</p>
-                        <div className="max-w-sm">
+                        <div className="w-full max-w-sm">
                           <PhotoUploader
                             multiple
                             onChange={(e) => handleUploadImage('ot', e.target.files)}
@@ -647,10 +647,10 @@ export function OrdenDetail() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                      <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <div className="text-center py-8 border-2 border-dashed rounded-lg flex flex-col items-center">
+                      <Camera className="w-12 h-12 text-gray-400 mb-2" />
                       <p className="text-gray-500 mb-3">No hay fotografías de arribo</p>
-                      <div className="max-w-sm mx-auto">
+                      <div className="w-full max-w-sm">
                         <PhotoUploader
                           multiple
                           onChange={(e) => handleUploadImage('ot', e.target.files)}
@@ -1094,9 +1094,9 @@ export function OrdenDetail() {
                       </div>
 
                       {/* Botón para agregar más fotos */}
-                      <div className="border-2 border-dashed rounded-lg p-4">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <span className="font-medium text-gray-700 mb-2">Agregar más fotografías</span>
+                      <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center text-center">
+                        <span className="font-medium text-gray-700 mb-2">Agregar más fotografías</span>
+                        <div className="w-full max-w-sm">
                           <PhotoUploader
                             multiple
                             onChange={(e) => handleUploadImage('pieza', e.target.files)}
