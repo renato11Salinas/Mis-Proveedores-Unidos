@@ -636,6 +636,10 @@ app.patch('/make-server-89c63dd1/ordenes/:id', async (c) => {
     };
 
     await setKV(`orden:${id}`, updatedOrden);
+    
+    // Invalidate cache
+    invalidateOrdenesCache();
+    
     return c.json({ orden: updatedOrden });
   } catch (error) {
     console.log(`Error updating orden: ${error}`);
