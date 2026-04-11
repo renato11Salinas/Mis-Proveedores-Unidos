@@ -592,7 +592,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Fecha: ${new Date(foto.uploadedAt).toLocaleString('es-ES')}`, margin + 5, yPos);
+      doc.text(`Fecha: ${foto.uploadedAt ? new Date(foto.uploadedAt).toLocaleString('es-ES') : 'Fecha no disponible'}`, margin + 5, yPos);
       yPos += 8;
       doc.setTextColor(0, 0, 0);
 
@@ -661,7 +661,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Fecha: ${new Date(foto.uploadedAt).toLocaleString('es-ES')}`, margin + 5, yPos);
+      doc.text(`Fecha: ${foto.uploadedAt ? new Date(foto.uploadedAt).toLocaleString('es-ES') : 'Fecha no disponible'}`, margin + 5, yPos);
       yPos += 8;
       doc.setTextColor(0, 0, 0);
 
@@ -731,7 +731,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 100, 100);
-      doc.text(`Fecha: ${new Date(foto.uploadedAt).toLocaleString('es-ES')}`, margin + 5, yPos);
+      doc.text(`Fecha: ${foto.uploadedAt ? new Date(foto.uploadedAt).toLocaleString('es-ES') : 'Fecha no disponible'}`, margin + 5, yPos);
       yPos += 8;
       doc.setTextColor(0, 0, 0);
 
@@ -818,7 +818,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       doc.setFont('helvetica', 'normal');
       doc.text(`Nombre: ${doc_item.data.nombre}`, margin + 55, yPos + 8);
       
-      const dateStr = new Date(doc_item.data.uploadedAt).toLocaleString('es-ES');
+      const dateStr = doc_item.data.uploadedAt ? new Date(doc_item.data.uploadedAt).toLocaleString('es-ES') : 'Fecha no disponible';
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       doc.text(dateStr, maxWidth - margin - 20, yPos + 8);

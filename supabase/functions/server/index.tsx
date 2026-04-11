@@ -747,6 +747,9 @@ app.post('/make-server-89c63dd1/ordenes/:id/imagenes', async (c) => {
 // Endpoints para documentos (base64)
 app.post('/make-server-89c63dd1/ordenes/:id/documentos', async (c) => {
   try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const supabase = getSupabaseClient();
+    
     console.log('Uploading document - parsing request...');
     const id = c.req.param('id');
     const { tipo, base64Data, nombre, mimeType } = await c.req.json();
@@ -759,11 +762,39 @@ app.post('/make-server-89c63dd1/ordenes/:id/documentos', async (c) => {
       return c.json({ error: 'Orden not found' }, 404);
     }
 
+    // Convert base64 to buffer to save in Storage instead of JSON database string (OOM Fix)
+    const base64String = base64Data.split(',')[1] || base64Data;
+    const buffer = Uint8Array.from(atob(base64String), char => char.charCodeAt(0));
+
+    // Upload to Supabase Storage
+    const bucketName = 'make-89c63dd1-photos';
+    const fileName = `${id}/documentos/${tipo}/${Date.now()}-${nombre}`;
+
+    console.log(`Uploading document to storage: ${bucketName}/${fileName}`);
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, buffer, {
+        contentType: mimeType || 'application/pdf',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.log(`Error uploading document to storage: ${uploadError.message}`);
+      return c.json({ error: `Error storage: ${uploadError.message}` }, 500);
+    }
+
+    // Generate signed URL
+    const { data: urlData, error: urlError } = await supabase.storage
+      .from(bucketName)
+      .createSignedUrl(fileName, 31536000); // 1 year
+
     const documento = {
       id: `doc-${Date.now()}`,
       nombre,
       mimeType,
-      base64Data,
+      url: urlData?.signedUrl || '',
+      storagePath: fileName,
       uploadedAt: new Date().toISOString(),
     };
 
@@ -777,22 +808,23 @@ app.post('/make-server-89c63dd1/ordenes/:id/documentos', async (c) => {
       orden.fichaComponente = documento;
     }
 
-    console.log(`Saving orden with new document...`);
+    console.log(`Saving orden with new document structure...`);
     await setKV(`orden:${id}`, orden);
     
-    console.log(`Document uploaded successfully for orden ${id}`);
+    // Invalidate cache
+    invalidateOrdenesCache();
     
-    // Return a lightweight response without base64 data to avoid timeout
+    // Return a lightweight response
     const lightweightResponse = {
       documento: {
         id: documento.id,
         nombre: documento.nombre,
         mimeType: documento.mimeType,
+        url: documento.url,
         uploadedAt: documento.uploadedAt,
       },
       orden: {
         ...orden,
-        // Remove base64 data from response
         fotografiasIncluyeOT: orden.fotografiasIncluyeOT?.map(f => ({
           id: f.id,
           nombre: f.nombre,
@@ -838,7 +870,6 @@ app.post('/make-server-89c63dd1/ordenes/:id/documentos', async (c) => {
     return c.json(lightweightResponse);
   } catch (error) {
     console.log(`Error uploading document: ${error}`);
-    console.log(`Error stack: ${error.stack}`);
     return c.json({ error: `Error uploading document: ${error.message || error}` }, 500);
   }
 });

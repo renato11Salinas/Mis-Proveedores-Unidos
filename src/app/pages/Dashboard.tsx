@@ -27,12 +27,20 @@ export function Dashboard() {
   const loadOrdenes = async () => {
     try {
       const response = await api.getOrdenes();
-      if (response.ordenes) {
+      if (response.ordenes && !response.error) {
         setOrdenes(response.ordenes);
+      } else {
+        // Fallback robusto: si el servidor responde con 500 o no hay data, nos adaptamos usando los datos locales
+        console.warn('Backend returned empty or error, falling back to mock data:', response.error);
+        toast.error('Problema en la nube: Cargando datos de respaldo locales');
+        const { mockOrdenes } = await import('../data/mockData');
+        setOrdenes(mockOrdenes);
       }
     } catch (error) {
-      toast.error('Error al cargar las órdenes');
-      console.error('Error loading ordenes:', error);
+      toast.error('Error del servidor: Usando datos de respaldo');
+      console.error('Error loading ordenes, falling back to local mock data:', error);
+      const { mockOrdenes } = await import('../data/mockData');
+      setOrdenes(mockOrdenes);
     } finally {
       setLoading(false);
     }
