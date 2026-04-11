@@ -198,7 +198,7 @@ export function NuevaOrden() {
           );
           const ordenData = {
             ...datosComunes,
-            fotografiasIncluyeOT: fotosFiltradas,
+            fotografiasIncluyeOT: [], // Enviamos vacío inicialmente para no saturar memoria JSON
             nombreComponente: componentesValidos[i].nombre,
             esOrdenMultiple: true,
             ordenMultipleIndice: i,
@@ -214,6 +214,10 @@ export function NuevaOrden() {
             console.error(`Error creating orden ${i + 1}:`, response.error);
             throw new Error(response.error);
           } else if (response.orden) {
+            // AHORA que tenemos la orden ID creada, subimos sus fotos asociadas vía API especializada
+            for (const f of fotosFiltradas) {
+               await api.uploadImagen(response.orden.id, 'ot', f.base64Data, f.nombre);
+            }
             ordenesCreadas.push(response.orden);
           }
         }
@@ -232,7 +236,7 @@ export function NuevaOrden() {
         // Crear una sola orden
         const ordenData = {
           ...datosComunes,
-          fotografiasIncluyeOT: fotografias,
+          fotografiasIncluyeOT: [], // Evitamos saturar memoria con base64 gigantesco
           nombreComponente: componentesValidos[0].nombre,
           esOrdenMultiple: false,
         };
@@ -248,6 +252,11 @@ export function NuevaOrden() {
           toast.error(`Error al crear la orden: ${response.error}`);
           setIsSubmitting(false);
         } else if (response.orden) {
+          // AHORA subimos sus fotos secuencialmente usando el Storage
+          for (const f of fotografias) {
+             await api.uploadImagen(response.orden.id, 'ot', f.base64Data, f.nombre);
+          }
+
           toast.success(`Orden ${response.orden.numeroOT} creada exitosamente`);
           setTimeout(() => {
             navigate('/');
