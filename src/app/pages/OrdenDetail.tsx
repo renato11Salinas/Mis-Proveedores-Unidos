@@ -103,7 +103,7 @@ export function OrdenDetail() {
   const canAdvanceToLiberacionOT = () => {
     // Solo validar el documento cuando estamos EN "liberacion-ot" intentando avanzar
     if (orden.estado === 'liberacion-ot') {
-      return orden.ordenServicio && orden.ordenServicio.base64Data;
+      return !!orden.ordenServicio;
     }
     return true;
   };
@@ -401,35 +401,38 @@ export function OrdenDetail() {
       }
 
       const documento = response.orden[documentType];
-      if (!documento || !documento.base64Data) {
+      if (!documento || (!documento.base64Data && !documento.url)) {
         toast.error('El documento no está disponible');
         return;
       }
 
-      // Convertir base64 a blob y descargar
-      const base64Data = documento.base64Data.split(',')[1] || documento.base64Data;
-      const mimeType = documento.mimeType || 'application/pdf';
-      
-      // Decodificar base64
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      if (documento.url) {
+        // Nueva forma: navegar a la URL firmada
+        window.open(documento.url, '_blank');
+      } else if (documento.base64Data) {
+        // Forma antigua (legacy): decodificar base64
+        const base64Data = documento.base64Data.split(',')[1] || documento.base64Data;
+        const mimeType = documento.mimeType || 'application/pdf';
+        
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = documento.nombre;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: mimeType });
 
-      // Crear URL y descargar
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = documento.nombre;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success(`Documento "${documento.nombre}" descargado`);
+      toast.success(`Documento "${documento.nombre}" abierto correctamente`);
     } catch (error) {
       toast.error('Error al descargar el documento');
       console.error('Error downloading document:', error);
