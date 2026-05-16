@@ -97,12 +97,12 @@ export function Dashboard() {
   });
 
   const getEstadoBadge = (estado: string) => {
-    const step = workflowSteps.find(s => s.id === estado);
+    const estadoEfectivo = estado === 'ingreso-datos' ? 'arribo' : estado;
+    const step = workflowSteps.find(s => s.id === estadoEfectivo);
     if (!step) return null;
 
     const colors: Record<string, string> = {
       'arribo': 'bg-gray-500',
-      'ingreso-datos': 'bg-blue-500',
       'llenado-rq': 'bg-indigo-500',
       'apertura-ot': 'bg-purple-500',
       'servicio': 'bg-yellow-500',
@@ -136,7 +136,8 @@ export function Dashboard() {
 
     // Preparar datos para Excel completos
     const excelData = ordenesToDownload.map(orden => {
-      const stepName = workflowSteps.find(s => s.id === orden.estado)?.name || orden.estado;
+      const estadoEfectivo = orden.estado === 'ingreso-datos' ? 'arribo' : orden.estado;
+      const stepName = workflowSteps.find(s => s.id === estadoEfectivo)?.name || orden.estado;
 
       return {
         'Número OT': orden.numeroOT || '',

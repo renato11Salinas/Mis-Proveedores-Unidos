@@ -7,7 +7,8 @@ interface WorkflowProgressProps {
 }
 
 export function WorkflowProgress({ currentStep }: WorkflowProgressProps) {
-  const currentIndex = workflowSteps.findIndex(step => step.id === currentStep);
+  const effectiveStep = currentStep === 'ingreso-datos' ? 'arribo' : currentStep;
+  const currentIndex = workflowSteps.findIndex(step => step.id === effectiveStep);
 
   return (
     <div className="w-full py-6">

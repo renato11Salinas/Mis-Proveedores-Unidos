@@ -1,6 +1,5 @@
 export type WorkflowStep = 
   | 'arribo'
-  | 'ingreso-datos'
   | 'llenado-rq'
   | 'apertura-ot'
   | 'servicio'

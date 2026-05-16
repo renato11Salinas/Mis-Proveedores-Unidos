@@ -1,8 +1,7 @@
 import { OrdenTrabajo, WorkflowStepInfo } from '../types';
 
 export const workflowSteps: WorkflowStepInfo[] = [
-  { id: 'arribo', name: 'Arribo de Componente', description: 'Recepción del componente', icon: '📦' },
-  { id: 'ingreso-datos', name: 'Ingreso de Datos', description: 'Registro de información del servicio', icon: '📝' },
+  { id: 'arribo', name: 'Ingreso de componente y datos', description: 'Recepción del componente en el taller', icon: '📦' },
   { id: 'liberacion-ot', name: 'Liberación de OT', description: 'Liberación de orden de trabajo', icon: '✅' },
   { id: 'servicio', name: 'Procede al Servicio', description: 'Ejecución del servicio', icon: '🔧' },
   { id: 'revision-calidad', name: 'Revisión de Calidad', description: 'Control de calidad', icon: '🔍' },
@@ -16,7 +15,7 @@ export const mockOrdenes: OrdenTrabajo[] = [
     id: '1',
     numeroOT: 'OT MPU: 5001-1-A26',
     fechaCreacion: '2025-03-10',
-    estado: 'ingreso-datos',
+    estado: 'arribo',
     nombreComponente: 'Bearing Housing',
     dpObra: 'DP de obra',
     clienteNombre: 'Grupo SHANDZ S.A.',

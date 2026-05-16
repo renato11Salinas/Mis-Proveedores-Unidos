@@ -26,14 +26,6 @@ export function OrdenDetail() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showRetrocederDialog, setShowRetrocederDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('arribo');
-  const [isEditingDatos, setIsEditingDatos] = useState(false);
-  const [editedDatos, setEditedDatos] = useState({
-    clienteNombre: '',
-    clienteNumero: '',
-    dpObra: '',
-    edoObra: '',
-    servicioSolicitado: '',
-  });
   const [isEditingZonas, setIsEditingZonas] = useState(false);
   const [editedZonas, setEditedZonas] = useState('');
   const [isEditingTareas, setIsEditingTareas] = useState(false);
@@ -43,11 +35,18 @@ export function OrdenDetail() {
   const [editedArribo, setEditedArribo] = useState({
     numeroGuia: '',
     nombreComponente: '',
+    clienteNombre: '',
+    clienteNumero: '',
+    dpObra: '',
+    edoObra: '',
+    servicioSolicitado: '',
   });
   const [editingRevisionFotoIndex, setEditingRevisionFotoIndex] = useState<number | null>(null);
   const [editingRevisionFotoDesc, setEditingRevisionFotoDesc] = useState<string>('');
+  const [editingRevisionFotoNombre, setEditingRevisionFotoNombre] = useState<string>('');
   const [editingLimpiezaFotoIndex, setEditingLimpiezaFotoIndex] = useState<number | null>(null);
   const [editingLimpiezaFotoDesc, setEditingLimpiezaFotoDesc] = useState<string>('');
+  const [editingLimpiezaFotoNombre, setEditingLimpiezaFotoNombre] = useState<string>('');
 
   useEffect(() => {
     if (id) {
@@ -58,7 +57,7 @@ export function OrdenDetail() {
   useEffect(() => {
     // Cambiar automáticamente a la pestaña del paso actual
     if (orden?.estado) {
-      setActiveTab(orden.estado);
+      setActiveTab(orden.estado === 'ingreso-datos' ? 'arribo' : orden.estado);
     }
   }, [orden?.estado]);
 
@@ -94,8 +93,9 @@ export function OrdenDetail() {
     );
   }
 
-  const currentStepInfo = workflowSteps.find(s => s.id === orden.estado);
-  const currentIndex = workflowSteps.findIndex(s => s.id === orden.estado);
+  const estadoEfectivo = orden.estado === 'ingreso-datos' ? 'arribo' : orden.estado;
+  const currentStepInfo = workflowSteps.find(s => s.id === estadoEfectivo);
+  const currentIndex = workflowSteps.findIndex(s => s.id === estadoEfectivo);
   const nextStepInfo = currentIndex < workflowSteps.length - 1 ? workflowSteps[currentIndex + 1] : null;
   const previousStepInfo = currentIndex > 0 ? workflowSteps[currentIndex - 1] : null;
 
@@ -216,21 +216,7 @@ export function OrdenDetail() {
     }
   };
 
-  const handleSaveEditedDatos = async () => {
-    try {
-      const response = await api.updateOrden(id!, editedDatos);
-      if (response.orden) {
-        setOrden(response.orden);
-        toast.success('Datos actualizados exitosamente');
-        setIsEditingDatos(false);
-      } else {
-        toast.error('Error al actualizar los datos');
-      }
-    } catch (error) {
-      toast.error('Error al actualizar los datos');
-      console.error('Error updating datos:', error);
-    }
-  };
+
 
   const handleSaveZonas = async () => {
     try {
@@ -305,10 +291,15 @@ export function OrdenDetail() {
       const response = await api.updateOrden(id!, {
         numeroGuia: editedArribo.numeroGuia,
         nombreComponente: editedArribo.nombreComponente,
+        clienteNombre: editedArribo.clienteNombre,
+        clienteNumero: editedArribo.clienteNumero,
+        dpObra: editedArribo.dpObra,
+        edoObra: editedArribo.edoObra,
+        servicioSolicitado: editedArribo.servicioSolicitado,
       });
       if (response.orden) {
         setOrden(response.orden);
-        toast.success('Datos de arribo actualizados exitosamente');
+        toast.success('Datos actualizados exitosamente');
         setIsEditingArribo(false);
       } else {
         toast.error('Error al actualizar los datos');
@@ -325,6 +316,7 @@ export function OrdenDetail() {
       const updatedFotos = [...orden.fotografiasRevisionCalidad];
       updatedFotos[index] = {
         ...updatedFotos[index],
+        nombre: editingRevisionFotoNombre || updatedFotos[index].nombre,
         descripcion: editingRevisionFotoDesc
       };
 
@@ -351,6 +343,7 @@ export function OrdenDetail() {
       const updatedFotos = [...orden.fotografiasLimpiezaEmbalaje];
       updatedFotos[index] = {
         ...updatedFotos[index],
+        nombre: editingLimpiezaFotoNombre || updatedFotos[index].nombre,
         descripcion: editingLimpiezaFotoDesc
       };
 
@@ -527,7 +520,7 @@ export function OrdenDetail() {
               <CardHeader>
                 <div className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>📦 Arribo de Componente</CardTitle>
+                    <CardTitle>📦 Ingreso de componente y datos</CardTitle>
                     <CardDescription>Recepción del componente en el taller</CardDescription>
                   </div>
                   {!isEditingArribo && currentIndex >= 0 && (
@@ -536,6 +529,11 @@ export function OrdenDetail() {
                         setEditedArribo({
                           numeroGuia: orden.numeroGuia || '',
                           nombreComponente: orden.nombreComponente || '',
+                          clienteNombre: orden.clienteNombre || '',
+                          clienteNumero: orden.clienteNumero || '',
+                          dpObra: orden.dpObra || '',
+                          edoObra: orden.edoObra || '',
+                          servicioSolicitado: orden.servicioSolicitado || '',
                         });
                         setIsEditingArribo(true);
                       }}
@@ -555,32 +553,42 @@ export function OrdenDetail() {
               <CardContent className="space-y-6">
                 {isEditingArribo ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       <div>
-                        <Label htmlFor="edit-numeroGuia">Número de Guía</Label>
-                        <Input
-                          id="edit-numeroGuia"
-                          value={editedArribo.numeroGuia}
-                          onChange={(e) => setEditedArribo({ ...editedArribo, numeroGuia: e.target.value })}
-                          placeholder="Número de guía"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-600">Número de OT</label>
-                        <p className="font-semibold">{orden.numeroOT}</p>
+                        <Label htmlFor="edit-clienteNombre">Cliente</Label>
+                        <Input id="edit-clienteNombre" value={editedArribo.clienteNombre} onChange={(e) => setEditedArribo({ ...editedArribo, clienteNombre: e.target.value })} />
                       </div>
                       <div>
                         <Label htmlFor="edit-nombreComponente">Componente</Label>
-                        <Input
-                          id="edit-nombreComponente"
-                          value={editedArribo.nombreComponente}
-                          onChange={(e) => setEditedArribo({ ...editedArribo, nombreComponente: e.target.value })}
-                          placeholder="Nombre del componente"
-                        />
+                        <Input id="edit-nombreComponente" value={editedArribo.nombreComponente} onChange={(e) => setEditedArribo({ ...editedArribo, nombreComponente: e.target.value })} />
                       </div>
                       <div>
-                        <label className="text-sm text-gray-600">Fecha de Arribo</label>
+                        <label className="text-sm text-gray-600 mb-1 block">Fecha de Arribo</label>
                         <p className="font-semibold">{orden.fechaCreacion}</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-dpObra">Cod. Trabajo Cliente</Label>
+                        <Input id="edit-dpObra" value={editedArribo.dpObra} onChange={(e) => setEditedArribo({ ...editedArribo, dpObra: e.target.value })} />
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-600 mb-1 block">Número de OT</label>
+                        <p className="font-semibold">{orden.numeroOT}</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-clienteNumero">Número de Cliente</Label>
+                        <Input id="edit-clienteNumero" value={editedArribo.clienteNumero} onChange={(e) => setEditedArribo({ ...editedArribo, clienteNumero: e.target.value })} />
+                      </div>
+                      <div className="sm:col-span-2 lg:col-span-1">
+                        <Label htmlFor="edit-servicioSolicitado">Servicio Solicitado</Label>
+                        <Input id="edit-servicioSolicitado" value={editedArribo.servicioSolicitado} onChange={(e) => setEditedArribo({ ...editedArribo, servicioSolicitado: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-numeroGuia">Número de Guía</Label>
+                        <Input id="edit-numeroGuia" value={editedArribo.numeroGuia} onChange={(e) => setEditedArribo({ ...editedArribo, numeroGuia: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-edoObra">Estado de Ingreso</Label>
+                        <Input id="edit-edoObra" value={editedArribo.edoObra} onChange={(e) => setEditedArribo({ ...editedArribo, edoObra: e.target.value })} />
                       </div>
                     </div>
 
@@ -600,22 +608,43 @@ export function OrdenDetail() {
                     </div>
                   </>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                     <div>
-                      <label className="text-sm text-gray-600">Número de OT</label>
-                      <p className="font-semibold">{orden.numeroOT}</p>
+                      <label className="text-sm text-gray-600">Cliente</label>
+                      <p className="font-semibold break-words">{orden.clienteNombre || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Componente</label>
+                      <p className="font-semibold break-words">{orden.nombreComponente}</p>
                     </div>
                     <div>
                       <label className="text-sm text-gray-600">Fecha de Arribo</label>
                       <p className="font-semibold">{orden.fechaCreacion}</p>
                     </div>
                     <div>
-                      <label className="text-sm text-gray-600">Componente</label>
-                      <p className="font-semibold">{orden.nombreComponente}</p>
+                      <label className="text-sm text-gray-600">Cod. Trabajo Cliente</label>
+                      <p className="font-semibold">{orden.dpObra || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Número de OT MPU</label>
+                      <p className="font-semibold">{orden.numeroOT}</p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm text-gray-600">Número de Cliente</label>
+                      <p className="font-semibold">{orden.clienteNumero || '-'}</p>
+                    </div>
+                    <div className="sm:col-span-2 lg:col-span-1">
+                      <label className="text-sm text-gray-600">Servicio Solicitado</label>
+                      <p className="font-semibold uppercase">{orden.servicioSolicitado || '-'}</p>
                     </div>
                     <div>
                       <label className="text-sm text-gray-600">Número de Guía</label>
                       <p className="font-semibold">{orden.numeroGuia || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Estado de Ingreso</label>
+                      <p className="font-semibold uppercase">{orden.edoObra || '-'}</p>
                     </div>
                   </div>
                 )}
@@ -666,137 +695,7 @@ export function OrdenDetail() {
             </Card>
           </TabsContent>
 
-          {/* Ingreso de Datos */}
-          <TabsContent value="ingreso-datos">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>📝 Ingreso de Datos</CardTitle>
-                    <CardDescription>Registro de información del servicio</CardDescription>
-                  </div>
-                  {!isEditingDatos && currentIndex >= 1 && (
-                    <Button
-                      onClick={() => {
-                        setEditedDatos({
-                          clienteNombre: orden.clienteNombre || '',
-                          clienteNumero: orden.clienteNumero || '',
-                          dpObra: orden.dpObra || '',
-                          edoObra: orden.edoObra || '',
-                          servicioSolicitado: orden.servicioSolicitado || '',
-                        });
-                        setIsEditingDatos(true);
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      ✏️ Editar
-                    </Button>
-                  )}
-                  {currentIndex < 1 && (
-                    <Badge variant="secondary" className="text-xs">
-                      🔒 Bloqueado hasta apertura
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isEditingDatos ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <Label htmlFor="edit-clienteNombre">Cliente</Label>
-                        <Input
-                          id="edit-clienteNombre"
-                          value={editedDatos.clienteNombre}
-                          onChange={(e) => setEditedDatos({ ...editedDatos, clienteNombre: e.target.value })}
-                          placeholder="Nombre del cliente"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-clienteNumero">Número de Cliente</Label>
-                        <Input
-                          id="edit-clienteNumero"
-                          value={editedDatos.clienteNumero}
-                          onChange={(e) => setEditedDatos({ ...editedDatos, clienteNumero: e.target.value })}
-                          placeholder="Número de cliente"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-dpObra">Cod. Trabajo Cliente</Label>
-                        <Input
-                          id="edit-dpObra"
-                          value={editedDatos.dpObra}
-                          onChange={(e) => setEditedDatos({ ...editedDatos, dpObra: e.target.value })}
-                          placeholder="Código de trabajo del cliente"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-edoObra">Estado de Ingreso</Label>
-                        <Input
-                          id="edit-edoObra"
-                          value={editedDatos.edoObra}
-                          onChange={(e) => setEditedDatos({ ...editedDatos, edoObra: e.target.value })}
-                          placeholder="Estado de ingresos"
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <Label htmlFor="edit-servicioSolicitado">Servicio Solicitado</Label>
-                      <Input
-                        id="edit-servicioSolicitado"
-                        value={editedDatos.servicioSolicitado}
-                        onChange={(e) => setEditedDatos({ ...editedDatos, servicioSolicitado: e.target.value })}
-                        placeholder="Descripción del servicio"
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-4 border-t">
-                      <Button
-                        onClick={() => setIsEditingDatos(false)}
-                        variant="outline"
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        onClick={handleSaveEditedDatos}
-                        className="bg-blue-600 text-white hover:bg-blue-700"
-                      >
-                        💾 Guardar Cambios
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-sm text-gray-600">Cliente</label>
-                        <p className="font-semibold">{orden.clienteNombre || '-'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-600">Número de Cliente</label>
-                        <p className="font-semibold">{orden.clienteNumero || '-'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-600">Cod. Trabajo Cliente</label>
-                        <p className="font-semibold">{orden.dpObra || '-'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-600">Estado de Ingreso</label>
-                        <p className="font-semibold">{orden.edoObra || '-'}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-gray-600">Servicio Solicitado</label>
-                      <p className="font-semibold">{orden.servicioSolicitado || '-'}</p>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Liberación de OT */}
           <TabsContent value="liberacion-ot">
@@ -1179,11 +1078,17 @@ export function OrdenDetail() {
                                 className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border-2 block"
                               />
                               <div className="flex-1 space-y-2">
-                                <p className="font-semibold text-sm">{foto.nombre}</p>
                                 {editingRevisionFotoIndex === index ? (
                                   <div className="space-y-2 mt-2">
+                                    <Input
+                                      className="w-full font-semibold text-sm"
+                                      placeholder="Título de la imagen"
+                                      value={editingRevisionFotoNombre}
+                                      onChange={(e) => setEditingRevisionFotoNombre(e.target.value)}
+                                    />
                                     <textarea
                                       className="w-full min-h-[80px] p-2 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Descripción del procedimiento"
                                       value={editingRevisionFotoDesc}
                                       onChange={(e) => setEditingRevisionFotoDesc(e.target.value)}
                                     />
@@ -1194,6 +1099,7 @@ export function OrdenDetail() {
                                   </div>
                                 ) : (
                                   <div>
+                                    <p className="font-semibold text-sm mb-1">{foto.nombre}</p>
                                     {foto.descripcion ? (
                                       <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                                         {foto.descripcion}
@@ -1208,9 +1114,10 @@ export function OrdenDetail() {
                                       onClick={() => {
                                         setEditingRevisionFotoIndex(index);
                                         setEditingRevisionFotoDesc(foto.descripcion || '');
+                                        setEditingRevisionFotoNombre(foto.nombre || '');
                                       }}
                                     >
-                                      ✏️ Editar descripción
+                                      ✏️ Editar
                                     </Button>
                                   </div>
                                 )}
@@ -1258,11 +1165,17 @@ export function OrdenDetail() {
                                 className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border-2 block"
                               />
                               <div className="flex-1 space-y-2">
-                                <p className="font-semibold text-sm">{foto.nombre}</p>
                                 {editingLimpiezaFotoIndex === index ? (
                                   <div className="space-y-2 mt-2">
+                                    <Input
+                                      className="w-full font-semibold text-sm"
+                                      placeholder="Título de la imagen"
+                                      value={editingLimpiezaFotoNombre}
+                                      onChange={(e) => setEditingLimpiezaFotoNombre(e.target.value)}
+                                    />
                                     <textarea
                                       className="w-full min-h-[80px] p-2 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Descripción del procedimiento"
                                       value={editingLimpiezaFotoDesc}
                                       onChange={(e) => setEditingLimpiezaFotoDesc(e.target.value)}
                                     />
@@ -1273,6 +1186,7 @@ export function OrdenDetail() {
                                   </div>
                                 ) : (
                                   <div>
+                                    <p className="font-semibold text-sm mb-1">{foto.nombre}</p>
                                     {foto.descripcion ? (
                                       <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                                         {foto.descripcion}
@@ -1287,9 +1201,10 @@ export function OrdenDetail() {
                                       onClick={() => {
                                         setEditingLimpiezaFotoIndex(index);
                                         setEditingLimpiezaFotoDesc(foto.descripcion || '');
+                                        setEditingLimpiezaFotoNombre(foto.nombre || '');
                                       }}
                                     >
-                                      ✏️ Editar descripción
+                                      ✏️ Editar
                                     </Button>
                                   </div>
                                 )}
@@ -1318,8 +1233,18 @@ export function OrdenDetail() {
           <TabsContent value="entrega">
             <Card>
               <CardHeader>
-                <CardTitle>🚚 Entrega del Servicio</CardTitle>
-                <CardDescription>Documentos y entrega al cliente</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>🚚 Entrega del Servicio</CardTitle>
+                    <CardDescription>Documentos y entrega al cliente</CardDescription>
+                  </div>
+                  <Button 
+                    onClick={handleGeneratePDF} 
+                    className="bg-blue-800 hover:bg-blue-900 text-white font-bold tracking-wide"
+                  >
+                    INFORME PRELIMINAR
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -1351,7 +1276,7 @@ export function OrdenDetail() {
                   <div className="flex items-center gap-3">
                     <FileText className="w-8 h-8 text-green-600" />
                     <div>
-                      <p className="font-semibold">Ficha Final del Componente</p>
+                      <p className="font-semibold">Hoja de Ruta del componente</p>
                       <p className="text-sm text-gray-600">
                         {orden.fichaComponente ? 'Cargado' : 'Pendiente'}
                       </p>

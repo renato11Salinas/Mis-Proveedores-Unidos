@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { workflowSteps } from '../data/mockData';
 
 export interface OrdenData {
   numeroOT: string;
@@ -364,13 +365,16 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
   doc.setFont('helvetica', 'bold');
   doc.text('Estado:', margin + 5, yPos);
   doc.setFont('helvetica', 'normal');
+  // Find step name
+  const stepName = workflowSteps.find(s => s.id === orden.estado)?.name || orden.estado;
+
   // Status badge style
   doc.setFillColor(34, 197, 94);
   doc.roundedRect(margin + 45, yPos - 3.5, 30, 5, 1, 1, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text(orden.estado.toUpperCase(), margin + 47, yPos + 0.5);
+  doc.text(stepName.toUpperCase(), margin + 47, yPos + 0.5);
   doc.setTextColor(0, 0, 0);
   doc.setFontSize(10);
 
@@ -554,7 +558,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     yPos += 6;
   }
 
-  // Fotografías de Arribo - Executive style
+  // Fotografías de Ingreso - Executive style
   if (orden.fotografiasIncluyeOT && orden.fotografiasIncluyeOT.length > 0) {
     checkNewPage(50);
     doc.setFillColor(37, 99, 235);
@@ -562,7 +566,7 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('7. FOTOGRAFÍAS DE ARRIBO', margin + 3, yPos + 5.5);
+    doc.text('7. FOTOGRAFÍAS DE INGRESO DE COMPONENTE Y DATOS', margin + 3, yPos + 5.5);
     yPos += 12;
 
     doc.setTextColor(0, 0, 0);
