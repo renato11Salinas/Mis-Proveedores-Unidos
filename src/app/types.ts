@@ -61,6 +61,9 @@ export interface OrdenTrabajo {
   // Insumos/Compras
   requerimientoInsumos?: string;
   requerimientoCompra?: string;
+  
+  // Estado de anulación
+  anulado?: boolean;
 }
 
 export interface WorkflowStepInfo {

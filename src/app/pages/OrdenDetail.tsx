@@ -6,7 +6,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { ArrowLeft, Camera, CheckCircle, FileText, Download, Undo2, Upload, AlertCircle, X } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle, FileText, Download, Undo2, Upload, AlertCircle, X, Trash2, Ban } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '../components/ui/alert-dialog';
 import { workflowSteps } from '../data/mockData';
 import { WorkflowProgress } from '../components/workflow/WorkflowProgress';
 import { ConfirmarAvanceDialog } from '../components/workflow/ConfirmarAvanceDialog';
@@ -47,6 +57,24 @@ export function OrdenDetail() {
   const [editingLimpiezaFotoIndex, setEditingLimpiezaFotoIndex] = useState<number | null>(null);
   const [editingLimpiezaFotoDesc, setEditingLimpiezaFotoDesc] = useState<string>('');
   const [editingLimpiezaFotoNombre, setEditingLimpiezaFotoNombre] = useState<string>('');
+
+  const [showAnularDialog, setShowAnularDialog] = useState(false);
+
+  const handleAnularOT = async () => {
+    try {
+      const response = await api.updateOrden(id!, { anulado: true, estado: 'anulado' });
+      if (response.orden) {
+        setOrden(response.orden);
+        toast.success('Orden anulada exitosamente');
+        setShowAnularDialog(false);
+      } else {
+        toast.error('Error al anular la orden');
+      }
+    } catch (error) {
+      toast.error('Error al anular la orden');
+      console.error('Error anulando OT:', error);
+    }
+  };
 
   useEffect(() => {
     if (id) {
@@ -364,7 +392,7 @@ export function OrdenDetail() {
     }
   };
 
-  const handleUpdateEstadoOT = async (nuevoEstado: 'Pendiente' | 'Aprobado' | 'Liberado') => {
+  const handleUpdateEstadoOT = async (nuevoEstado: 'Pendiente' | 'Liberado') => {
     try {
       const estadoOT = {
         estado: nuevoEstado,
@@ -432,6 +460,44 @@ export function OrdenDetail() {
     }
   };
 
+  const handleDeleteDocumento = async (documentType: 'ordenServicio' | 'guiaSalida' | 'informeComercial' | 'fichaComponente') => {
+    if (!confirm('¿Está seguro de que desea eliminar este documento?')) return;
+    try {
+      const response = await api.updateOrden(id!, { [documentType]: null });
+      if (response.orden) {
+        setOrden(response.orden);
+        toast.success('Documento eliminado exitosamente');
+      } else {
+        toast.error('Error al eliminar el documento');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar el documento');
+      console.error('Error deleting document:', error);
+    }
+  };
+
+  const handleDeleteFoto = async (
+    tipoArray: 'fotografiasIncluyeOT' | 'fotografiasPiezas' | 'fotografiasRevisionCalidad' | 'fotografiasLimpiezaEmbalaje',
+    index: number
+  ) => {
+    if (!confirm('¿Está seguro de que desea eliminar esta fotografía?')) return;
+    try {
+      const updatedFotos = [...(orden[tipoArray] || [])];
+      updatedFotos.splice(index, 1);
+      
+      const response = await api.updateOrden(id!, { [tipoArray]: updatedFotos });
+      if (response.orden) {
+        setOrden(response.orden);
+        toast.success('Fotografía eliminada exitosamente');
+      } else {
+        toast.error('Error al eliminar la fotografía');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar la fotografía');
+      console.error('Error deleting photo:', error);
+    }
+  };
+
   const handleGeneratePDF = async () => {
     try {
       toast.info('Generando informe PDF (esto puede tomar unos segundos)...');
@@ -444,6 +510,8 @@ export function OrdenDetail() {
     }
   };
 
+  const isAnulada = !!orden.anulado || orden.estado === 'anulado';
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -455,7 +523,12 @@ export function OrdenDetail() {
               <span className="hidden sm:inline">Volver</span>
             </Button>
             <div className="flex-1 w-full">
-              <h1 className="text-xl sm:text-2xl font-bold sm:font-normal">{orden.numeroOT}</h1>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl sm:text-2xl font-bold sm:font-normal">{orden.numeroOT}</h1>
+                {isAnulada && (
+                  <Badge variant="destructive" className="bg-gray-600 hover:bg-gray-700">ANULADO</Badge>
+                )}
+              </div>
               <p className="text-sm sm:text-base text-gray-600 line-clamp-2">{orden.nombreComponente}</p>
             </div>
             <Badge className="bg-blue-600 text-white text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2">
@@ -476,13 +549,19 @@ export function OrdenDetail() {
             
 
             <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-3">
-              {previousStepInfo && orden.estado !== 'arribo' && (
+              {!isAnulada && orden.estado !== 'completado' && (
+                <Button onClick={() => setShowAnularDialog(true)} size="lg" variant="outline" className="text-gray-600 border-gray-300 hover:bg-gray-100 w-full sm:w-auto">
+                  <Ban className="w-4 h-4 mr-2" />
+                  Anular OT
+                </Button>
+              )}
+              {previousStepInfo && orden.estado !== 'arribo' && !isAnulada && (
                 <Button onClick={() => setShowRetrocederDialog(true)} size="lg" variant="outline" className="text-red-600 border-red-600 hover:bg-red-50 w-full sm:w-auto">
                   <Undo2 className="w-4 h-4 mr-2" />
                   Retroceder Etapa
                 </Button>
               )}
-              {nextStepInfo && orden.estado !== 'completado' && (
+              {nextStepInfo && orden.estado !== 'completado' && !isAnulada && (
                 <Button
                   onClick={() => setShowConfirmDialog(true)}
                   size="lg"
@@ -523,7 +602,7 @@ export function OrdenDetail() {
                     <CardTitle>📦 Ingreso de componente y datos</CardTitle>
                     <CardDescription>Recepción del componente en el taller</CardDescription>
                   </div>
-                  {!isEditingArribo && currentIndex >= 0 && (
+                  {!isEditingArribo && currentIndex >= 0 && !isAnulada && (
                     <Button
                       onClick={() => {
                         setEditedArribo({
@@ -665,6 +744,17 @@ export function OrdenDetail() {
                             <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                               <p className="truncate">{foto.nombre || `Foto ${index + 1}`}</p>
                             </div>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 z-10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFoto('fotografiasIncluyeOT', index);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -709,37 +799,39 @@ export function OrdenDetail() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm text-gray-600 font-semibold">Tareas a Realizar</label>
-                    {!isEditingTareas && currentIndex >= 2 ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsEditingTareas(true);
-                          setEditedTareas(orden.tareasRealizar?.join('\n') || '');
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    ) : !isEditingTareas && currentIndex < 2 ? (
-                      <Badge variant="secondary" className="text-xs">
-                        🔒 Bloqueado
-                      </Badge>
-                    ) : (
-                      <div className="flex gap-2">
+                    {!isAnulada && (
+                      !isEditingTareas && currentIndex >= 1 ? (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setIsEditingTareas(false)}
+                          onClick={() => {
+                            setIsEditingTareas(true);
+                            setEditedTareas(orden.tareasRealizar?.join('\n') || '');
+                          }}
                         >
-                          Cancelar
+                          Editar
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveTareas}
-                        >
-                          Guardar
-                        </Button>
-                      </div>
+                      ) : !isEditingTareas && currentIndex < 1 ? (
+                        <Badge variant="secondary" className="text-xs">
+                          🔒 Bloqueado
+                        </Badge>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsEditingTareas(false)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveTareas}
+                          >
+                            Guardar
+                          </Button>
+                        </div>
+                      )
                     )}
                   </div>
 
@@ -824,10 +916,15 @@ export function OrdenDetail() {
                             </p>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDocument('ordenServicio')}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Ver Documento
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadDocument('ordenServicio')}>
+                            <Download className="w-4 h-4 mr-2" />
+                            Ver Documento
+                          </Button>
+                          <Button variant="destructive" size="icon" onClick={() => handleDeleteDocumento('ordenServicio')}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -855,29 +952,28 @@ export function OrdenDetail() {
                   <div className="space-y-4">
                     <div>
                       <Label className="text-sm font-semibold mb-3 block">Estado de Liberación</Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Button
-                          variant={orden.estadoAperturaOT?.estado === 'Pendiente' ? 'default' : 'outline'}
-                          className={orden.estadoAperturaOT?.estado === 'Pendiente' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
-                          onClick={() => handleUpdateEstadoOT('Pendiente')}
-                        >
-                          Pendiente
-                        </Button>
-                        <Button
-                          variant={orden.estadoAperturaOT?.estado === 'Aprobado' ? 'default' : 'outline'}
-                          className={orden.estadoAperturaOT?.estado === 'Aprobado' ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                          onClick={() => handleUpdateEstadoOT('Aprobado')}
-                        >
-                          Aprobado
-                        </Button>
-                        <Button
-                          variant={orden.estadoAperturaOT?.estado === 'Liberado' ? 'default' : 'outline'}
-                          className={orden.estadoAperturaOT?.estado === 'Liberado' ? 'bg-green-600 hover:bg-green-700' : ''}
-                          onClick={() => handleUpdateEstadoOT('Liberado')}
-                        >
-                          Liberado
-                        </Button>
-                      </div>
+                      {!isAnulada ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Button
+                            variant={orden.estadoAperturaOT?.estado === 'Pendiente' ? 'default' : 'outline'}
+                            className={orden.estadoAperturaOT?.estado === 'Pendiente' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+                            onClick={() => handleUpdateEstadoOT('Pendiente')}
+                          >
+                            Pendiente
+                          </Button>
+                          <Button
+                            variant={orden.estadoAperturaOT?.estado === 'Liberado' ? 'default' : 'outline'}
+                            className={orden.estadoAperturaOT?.estado === 'Liberado' ? 'bg-green-600 hover:bg-green-700' : ''}
+                            onClick={() => handleUpdateEstadoOT('Liberado')}
+                          >
+                            Liberado
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="text-sm px-4 py-2 opacity-70">
+                          {orden.estadoAperturaOT?.estado || 'Pendiente'}
+                        </Badge>
+                      )}
                     </div>
 
                     {orden.estadoAperturaOT && (
@@ -916,38 +1012,40 @@ export function OrdenDetail() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm text-gray-600">Zonas a Trabajar</label>
-                    {!isEditingZonas && currentIndex >= 3 ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsEditingZonas(true);
-                          // Convert array to comma-separated string
-                          setEditedZonas(orden.zonasTrabajar?.join(', ') || '');
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    ) : !isEditingZonas && currentIndex < 3 ? (
-                      <Badge variant="secondary" className="text-xs">
-                        🔒 Bloqueado
-                      </Badge>
-                    ) : (
-                      <div className="flex gap-2">
+                    {!isAnulada && (
+                      !isEditingZonas && currentIndex >= 2 ? (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setIsEditingZonas(false)}
+                          onClick={() => {
+                            setIsEditingZonas(true);
+                            // Convert array to comma-separated string
+                            setEditedZonas(orden.zonasTrabajar?.join(', ') || '');
+                          }}
                         >
-                          Cancelar
+                          Editar
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleSaveZonas}
-                        >
-                          Guardar
-                        </Button>
-                      </div>
+                      ) : !isEditingZonas && currentIndex < 2 ? (
+                        <Badge variant="secondary" className="text-xs">
+                          🔒 Bloqueado
+                        </Badge>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsEditingZonas(false)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSaveZonas}
+                          >
+                            Guardar
+                          </Button>
+                        </div>
+                      )
                     )}
                   </div>
 
@@ -991,6 +1089,17 @@ export function OrdenDetail() {
                                 {foto.nombre}
                               </p>
                             </div>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 z-10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteFoto('fotografiasPiezas', index);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -1107,18 +1216,28 @@ export function OrdenDetail() {
                                     ) : (
                                       <p className="text-sm text-gray-400 italic">Sin descripción</p>
                                     )}
-                                    <Button 
-                                      variant="link" 
-                                      size="sm" 
-                                      className="px-0 text-blue-600 h-auto py-1 mt-1"
-                                      onClick={() => {
-                                        setEditingRevisionFotoIndex(index);
-                                        setEditingRevisionFotoDesc(foto.descripcion || '');
-                                        setEditingRevisionFotoNombre(foto.nombre || '');
-                                      }}
-                                    >
-                                      ✏️ Editar
-                                    </Button>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Button 
+                                        variant="link" 
+                                        size="sm" 
+                                        className="px-0 text-blue-600 h-auto py-1"
+                                        onClick={() => {
+                                          setEditingRevisionFotoIndex(index);
+                                          setEditingRevisionFotoDesc(foto.descripcion || '');
+                                          setEditingRevisionFotoNombre(foto.nombre || '');
+                                        }}
+                                      >
+                                        ✏️ Editar
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
+                                        onClick={() => handleDeleteFoto('fotografiasRevisionCalidad', index)}
+                                      >
+                                        <X className="h-5 w-5" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1194,18 +1313,28 @@ export function OrdenDetail() {
                                     ) : (
                                       <p className="text-sm text-gray-400 italic">Sin descripción</p>
                                     )}
-                                    <Button 
-                                      variant="link" 
-                                      size="sm" 
-                                      className="px-0 text-blue-600 h-auto py-1 mt-1"
-                                      onClick={() => {
-                                        setEditingLimpiezaFotoIndex(index);
-                                        setEditingLimpiezaFotoDesc(foto.descripcion || '');
-                                        setEditingLimpiezaFotoNombre(foto.nombre || '');
-                                      }}
-                                    >
-                                      ✏️ Editar
-                                    </Button>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Button 
+                                        variant="link" 
+                                        size="sm" 
+                                        className="px-0 text-blue-600 h-auto py-1"
+                                        onClick={() => {
+                                          setEditingLimpiezaFotoIndex(index);
+                                          setEditingLimpiezaFotoDesc(foto.descripcion || '');
+                                          setEditingLimpiezaFotoNombre(foto.nombre || '');
+                                        }}
+                                      >
+                                        ✏️ Editar
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
+                                        onClick={() => handleDeleteFoto('fotografiasLimpiezaEmbalaje', index)}
+                                      >
+                                        <X className="h-5 w-5" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1258,10 +1387,15 @@ export function OrdenDetail() {
                     </div>
                   </div>
                   {orden.guiaSalida ? (
-                    <Button variant="outline" onClick={() => handleDownloadDocument('guiaSalida')}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Descargar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleDownloadDocument('guiaSalida')}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Descargar
+                      </Button>
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteDocumento('guiaSalida')}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <Input
                       type="file"
@@ -1283,10 +1417,15 @@ export function OrdenDetail() {
                     </div>
                   </div>
                   {orden.fichaComponente ? (
-                    <Button variant="outline" onClick={() => handleDownloadDocument('fichaComponente')}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Descargar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleDownloadDocument('fichaComponente')}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Descargar
+                      </Button>
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteDocumento('fichaComponente')}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <Input
                       type="file"
@@ -1308,10 +1447,15 @@ export function OrdenDetail() {
                     </div>
                   </div>
                   {orden.informeComercial ? (
-                    <Button variant="outline" onClick={() => handleDownloadDocument('informeComercial')}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Descargar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleDownloadDocument('informeComercial')}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Descargar
+                      </Button>
+                      <Button variant="destructive" size="icon" onClick={() => handleDeleteDocumento('informeComercial')}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   ) : (
                     <Input
                       type="file"
@@ -1391,6 +1535,22 @@ export function OrdenDetail() {
           onConfirm={handleRetrocederEtapa}
         />
       )}
+      <AlertDialog open={showAnularDialog} onOpenChange={setShowAnularDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Está seguro que desea anular esta Orden de Trabajo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción la marcará como anulada irreversiblemente, pero mantendrá su historial y número de OT en el sistema para evitar discrepancias documentarias. No podrá ser editada ni avanzar etapas después de anularse.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAnularOT} className="bg-red-600 hover:bg-red-700 text-white border-0">
+              Anular OT
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

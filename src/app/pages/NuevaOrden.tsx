@@ -6,7 +6,17 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Save, ArrowLeft, Plus, X, Upload, Camera } from 'lucide-react';
+import { Save, ArrowLeft, Plus, X, Upload, Camera, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '../components/ui/alert-dialog';
 import { api } from '../lib/supabase';
 import { toast } from 'sonner';
 import { ClienteSelector } from '../components/clientes/ClienteSelector';
@@ -54,6 +64,11 @@ export function NuevaOrden() {
   const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showClienteModal, setShowClienteModal] = useState(false);
+  
+  // Duplicate alert state
+  const [showDuplicateAlert, setShowDuplicateAlert] = useState(false);
+  const [duplicateData, setDuplicateData] = useState<{ ot: string, component: string, fotoUrl?: string } | null>(null);
+  const [pendingSubmitData, setPendingSubmitData] = useState<NuevaOrdenFormData | null>(null);
 
   const agregarComponente = () => {
     if (nuevoComponente.trim()) {
@@ -126,17 +141,74 @@ export function NuevaOrden() {
     }
   };
 
+  const checkDuplicates = async (data: NuevaOrdenFormData, componentesValidos: Componente[]) => {
+    const cleanGuia = (guia?: string) => (guia || '').replace(/0/g, '').toLowerCase().trim();
+    const inputGuia = cleanGuia(data.numeroGuia);
+
+    try {
+      const response = await api.getOrdenes(true);
+      const ordenes = response.ordenes || [];
+
+      for (const comp of componentesValidos) {
+        const compNombre = comp.nombre.toLowerCase().trim();
+        const duplicate = ordenes.find((o: any) => 
+          o.nombreComponente?.toLowerCase().trim() === compNombre &&
+          cleanGuia(o.numeroGuia) === inputGuia &&
+          o.clienteId === selectedClienteId
+        );
+
+        if (duplicate) {
+          // Obtener foto si existe
+          const fotoUrl = duplicate.fotografiasIncluyeOT?.[0]?.url || duplicate.fotografiasIncluyeOT?.[0]?.base64Data;
+          setDuplicateData({
+            ot: duplicate.numeroOT,
+            component: duplicate.nombreComponente,
+            fotoUrl
+          });
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching orders for duplicate check:', error);
+    }
+    return false;
+  };
+
   const onSubmit = async (data: NuevaOrdenFormData) => {
+    setIsSubmitting(true);
+
+    const componentesValidos = componentes.filter(c => c.nombre.trim());
+    if (componentesValidos.length === 0) {
+      toast.error('Debe ingresar al menos un componente');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!selectedClienteId) {
+      toast.error('Debe seleccionar un cliente');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const hasDuplicate = await checkDuplicates(data, componentesValidos);
+    if (hasDuplicate) {
+      setPendingSubmitData(data);
+      setShowDuplicateAlert(true);
+      setIsSubmitting(false);
+    } else {
+      proceedWithSubmit(data, componentesValidos);
+    }
+  };
+
+  const proceedWithSubmit = async (dataParam?: NuevaOrdenFormData, componentesValidosParam?: Componente[]) => {
+    const data = dataParam || pendingSubmitData;
+    if (!data) return;
+    
     try {
       setIsSubmitting(true);
+      setShowDuplicateAlert(false);
 
-      // Validar que haya al menos un componente con nombre
-      const componentesValidos = componentes.filter(c => c.nombre.trim());
-      if (componentesValidos.length === 0) {
-        toast.error('Debe ingresar al menos un componente');
-        setIsSubmitting(false);
-        return;
-      }
+      const componentesValidos = componentesValidosParam || componentes.filter(c => c.nombre.trim());
 
       console.log('Creating orden(es) with data:', data);
 
@@ -494,6 +566,41 @@ export function NuevaOrden() {
         cliente={null}
         mode="create"
       />
+
+      {/* Alerta de duplicidad */}
+      <AlertDialog open={showDuplicateAlert} onOpenChange={setShowDuplicateAlert}>
+        <AlertDialogContent className="sm:max-w-md text-center flex flex-col items-center">
+          <AlertDialogHeader className="flex flex-col items-center">
+            <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+            <AlertDialogTitle className="text-xl font-normal text-center">
+              Se detectó duplicidad de información con la OT – {duplicateData?.ot}.<br />
+              ¿Desea continuar?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center mt-2">
+              El componente <strong>{duplicateData?.component}</strong> con la misma guía ya ha sido registrado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {duplicateData?.fotoUrl && (
+            <div className="w-full mt-4 flex justify-center">
+              <ZoomableImage 
+                src={duplicateData.fotoUrl} 
+                alt={`OT-${duplicateData.ot}`} 
+                className="w-48 h-48 object-cover rounded-md border" 
+              />
+            </div>
+          )}
+
+          <AlertDialogFooter className="sm:justify-center flex gap-4 w-full mt-6">
+            <AlertDialogCancel className="w-full m-0" onClick={() => setPendingSubmitData(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction className="w-full m-0 bg-[#FF4D4D] hover:bg-[#ff3333] text-white border-0 shadow-none" onClick={() => proceedWithSubmit()}>
+              Do it now!
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

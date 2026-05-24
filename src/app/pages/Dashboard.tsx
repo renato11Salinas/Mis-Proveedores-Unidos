@@ -76,7 +76,14 @@ export function Dashboard() {
       orden.clienteNombre?.toLowerCase().includes(searchTerm.toLowerCase());
 
     // State filter
-    const matchesEstado = selectedEstado === 'all' || orden.estado === selectedEstado;
+    let matchesEstado = true;
+    const isAnulada = !!orden.anulado || orden.estado === 'anulado';
+    
+    if (selectedEstado === 'anulado') {
+      matchesEstado = isAnulada;
+    } else if (selectedEstado !== 'all') {
+      matchesEstado = !isAnulada && orden.estado === selectedEstado;
+    }
 
     // Date filters 
     let matchesYear = true;
@@ -96,8 +103,17 @@ export function Dashboard() {
     return matchesSearch && matchesEstado && matchesYear && matchesMonth;
   });
 
-  const getEstadoBadge = (estado: string) => {
-    const estadoEfectivo = estado === 'ingreso-datos' ? 'arribo' : estado;
+  const getEstadoBadge = (orden: OrdenTrabajo) => {
+    const isAnulada = !!orden.anulado || orden.estado === 'anulado';
+    if (isAnulada) {
+      return (
+        <Badge className="bg-gray-700 text-white hover:bg-gray-800">
+          ANULADO
+        </Badge>
+      );
+    }
+
+    const estadoEfectivo = orden.estado === 'ingreso-datos' ? 'arribo' : orden.estado;
     const step = workflowSteps.find(s => s.id === estadoEfectivo);
     if (!step) return null;
 
@@ -113,7 +129,7 @@ export function Dashboard() {
     };
 
     return (
-      <Badge className={`${colors[estado]} text-white`}>
+      <Badge className={`${colors[orden.estado]} text-white`}>
         {step.icon} {step.name}
       </Badge>
     );
@@ -121,8 +137,8 @@ export function Dashboard() {
 
   const stats = {
     total: ordenes.length,
-    enProceso: ordenes.filter(o => o.estado !== 'completado').length,
-    completados: ordenes.filter(o => o.estado === 'completado').length,
+    enProceso: ordenes.filter(o => o.estado !== 'completado' && !o.anulado && o.estado !== 'anulado').length,
+    completados: ordenes.filter(o => o.estado === 'completado' && !o.anulado && o.estado !== 'anulado').length,
   };
 
   // Función para descargar órdenes como Excel
@@ -139,10 +155,11 @@ export function Dashboard() {
       const estadoEfectivo = orden.estado === 'ingreso-datos' ? 'arribo' : orden.estado;
       const stepName = workflowSteps.find(s => s.id === estadoEfectivo)?.name || orden.estado;
 
+      const isAnulada = !!orden.anulado || orden.estado === 'anulado';
       return {
         'Número OT': orden.numeroOT || '',
         'Fecha Creación': orden.fechaCreacion ? new Date(orden.fechaCreacion).toLocaleDateString('es-ES') : '',
-        'Estado': stepName,
+        'Estado': isAnulada ? 'Anulado' : stepName,
         'Componente': orden.nombreComponente || '',
         'Cliente': orden.clienteNombre || '',
         'RUC Cliente': (orden as any).clienteRuc || '',
@@ -327,6 +344,7 @@ export function Dashboard() {
                         {workflowSteps.map(step => (
                           <option key={step.id} value={step.id}>{step.name}</option>
                         ))}
+                        <option value="anulado">Anuladas</option>
                       </select>
                     </div>
 
@@ -399,14 +417,16 @@ export function Dashboard() {
               <CardContent>
                 {/* Scrollable container with fixed height */}
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                  {filteredOrdenes.slice(0, displayLimit).map((orden) => (
+                  {filteredOrdenes.slice(0, displayLimit).map((orden) => {
+                    const isAnulada = !!orden.anulado || orden.estado === 'anulado';
+                    return (
                     <Link key={orden.id} to={`/orden/${orden.id}`}>
-                      <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <div className={`border rounded-lg p-4 transition-colors cursor-pointer ${isAnulada ? 'bg-gray-200 opacity-80' : 'hover:bg-gray-50'}`}>
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                           <div className="flex-1 w-full">
                             <div className="flex flex-wrap items-center gap-3 mb-2">
                               <h3 className="font-semibold text-lg">{orden.numeroOT}</h3>
-                              {getEstadoBadge(orden.estado)}
+                              {getEstadoBadge(orden)}
                             </div>
                             <p className="text-gray-700 mb-1 line-clamp-2">{orden.nombreComponente}</p>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
@@ -423,7 +443,7 @@ export function Dashboard() {
                         </div>
                       </div>
                     </Link>
-                  ))}
+                  )})}
 
                   {filteredOrdenes.length === 0 && (
                     <div className="text-center py-12 text-gray-500">
