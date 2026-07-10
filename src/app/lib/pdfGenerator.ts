@@ -311,15 +311,23 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     const validFields = fields.filter(f => f.value);
     if (validFields.length === 0) return startY;
     
-    const availWidth = maxWidth - 50;
+    // Make text start more to the left (margin + 35 instead of margin + 45)
+    // This gives more available width and prevents it from looking "too far right"
+    const availWidth = maxWidth - 40; 
     let totalHeight = 5; // Top padding
+    
+    // Set font size explicitly before calculating text splits
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     
     // Calculate heights
     const processedFields = validFields.map(f => {
       if (f.isBadge) {
         return { ...f, lines: [f.value], height: 10 };
       } else {
-        const lines = doc.splitTextToSize(f.value || '', availWidth);
+        // Ensure it's a string and clean up weird line breaks
+        const cleanText = String(f.value || '').replace(/\r\n|\r|\n/g, ' ');
+        const lines = doc.splitTextToSize(cleanText, availWidth);
         const height = Math.max(7, lines.length * 6);
         return { ...f, lines, height };
       }
@@ -342,22 +350,23 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     // Draw text
     let currentY = startY + 7;
     processedFields.forEach(f => {
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text(f.label, margin + 5, currentY);
       doc.setFont('helvetica', 'normal');
       
       if (f.isBadge) {
         doc.setFillColor(f.badgeColor![0], f.badgeColor![1], f.badgeColor![2]);
-        doc.roundedRect(margin + 45, currentY - 3.5, 30, 5, 1, 1, 'F');
+        doc.roundedRect(margin + 35, currentY - 3.5, 30, 5, 1, 1, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.text(f.value.toUpperCase(), margin + 47, currentY + 0.5);
+        doc.text(f.value.toUpperCase(), margin + 37, currentY + 0.5);
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
       } else {
         f.lines.forEach((line: string, idx: number) => {
-          doc.text(line, margin + 45, currentY + (idx * 6));
+          doc.text(line, margin + 35, currentY + (idx * 6));
         });
       }
       currentY += f.height;
