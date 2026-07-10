@@ -306,17 +306,26 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       .join(' ');
   };
 
+  // Helper: Force break long words
+  const forceBreakLongWords = (text: string, maxLen: number = 30): string => {
+    if (!text) return '';
+    return text.split(' ').map(word => {
+      if (word.length > maxLen) {
+        return word.match(new RegExp('.{1,' + maxLen + '}', 'g'))?.join(' ') || word;
+      }
+      return word;
+    }).join(' ');
+  };
+
   // Helper for dynamic box rendering with text wrapping
   const drawInfoBox = (fields: {label: string, value: string, isBadge?: boolean, badgeColor?: [number, number, number]}[], startY: number) => {
     const validFields = fields.filter(f => f.value);
     if (validFields.length === 0) return startY;
     
-    // Make text start more to the left (margin + 35 instead of margin + 45)
-    // This gives more available width and prevents it from looking "too far right"
-    const availWidth = maxWidth - 40; 
+    // Layout apilado: el valor va debajo del label, dándole casi todo el ancho de la página
+    const availWidth = maxWidth - 15; 
     let totalHeight = 5; // Top padding
     
-    // Set font size explicitly before calculating text splits
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     
@@ -325,10 +334,9 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       if (f.isBadge) {
         return { ...f, lines: [f.value], height: 10 };
       } else {
-        // Ensure it's a string and clean up weird line breaks
-        const cleanText = String(f.value || '').replace(/\r\n|\r|\n/g, ' ');
+        const cleanText = forceBreakLongWords(String(f.value || '').replace(/\r\n|\r|\n/g, ' '));
         const lines = doc.splitTextToSize(cleanText, availWidth);
-        const height = Math.max(7, lines.length * 6);
+        const height = 5 + (lines.length * 5) + 3; // 5 para el label + 5 por cada línea de texto + 3 de padding
         return { ...f, lines, height };
       }
     });
@@ -353,23 +361,26 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.text(f.label, margin + 5, currentY);
-      doc.setFont('helvetica', 'normal');
       
       if (f.isBadge) {
+        doc.setFont('helvetica', 'normal');
+        const badgeX = margin + 5 + doc.getTextWidth(f.label) + 5;
         doc.setFillColor(f.badgeColor![0], f.badgeColor![1], f.badgeColor![2]);
-        doc.roundedRect(margin + 35, currentY - 3.5, 30, 5, 1, 1, 'F');
+        doc.roundedRect(badgeX, currentY - 3.5, 30, 5, 1, 1, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.text(f.value.toUpperCase(), margin + 37, currentY + 0.5);
+        doc.text(f.value.toUpperCase(), badgeX + 2, currentY + 0.5);
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
+        currentY += f.height;
       } else {
+        doc.setFont('helvetica', 'normal');
         f.lines.forEach((line: string, idx: number) => {
-          doc.text(line, margin + 35, currentY + (idx * 6));
+          doc.text(line, margin + 10, currentY + 5 + (idx * 5));
         });
+        currentY += f.height;
       }
-      currentY += f.height;
     });
     
     return startY + totalHeight + 5;
@@ -454,7 +465,8 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    const servicioLines = doc.splitTextToSize(orden.servicioSolicitado, maxWidth - 10);
+    const servicioText = forceBreakLongWords(orden.servicioSolicitado);
+    const servicioLines = doc.splitTextToSize(servicioText, maxWidth - 10);
     servicioLines.forEach((line: string) => {
       checkNewPage();
       doc.text(line, margin + 5, yPos);
@@ -479,12 +491,16 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     doc.setFontSize(11);
     orden.tareasRealizar.forEach((tarea, index) => {
       checkNewPage();
-      // Green checkmark for each task
-      doc.setTextColor(34, 197, 94);
-      doc.text('✓', margin + 5, yPos);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${tarea}`, margin + 12, yPos);
-      yPos += 7;
+      const textWrapped = doc.splitTextToSize(forceBreakLongWords(tarea), maxWidth - 20);
+      textWrapped.forEach((line: string, i: number) => {
+        if (i === 0) {
+          doc.setTextColor(34, 197, 94);
+          doc.text('✓', margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+        }
+        doc.text(line, margin + 12, yPos);
+        yPos += 7;
+      });
     });
     yPos += 6;
   }
@@ -503,8 +519,15 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     doc.setTextColor(0, 0, 0);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    doc.text(orden.zonasTrabajar.join(', '), margin + 5, yPos);
-    yPos += 12;
+    
+    const zonasText = forceBreakLongWords(orden.zonasTrabajar.join(', '));
+    const zonasWrapped = doc.splitTextToSize(zonasText, maxWidth - 10);
+    zonasWrapped.forEach((line: string) => {
+      checkNewPage();
+      doc.text(line, margin + 5, yPos);
+      yPos += 7;
+    });
+    yPos += 5;
   }
 
   // Plan de Calidad - Executive style
@@ -523,11 +546,16 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     doc.setFontSize(11);
     orden.planCalidad.inspeccionesFinales.forEach((inspeccion, index) => {
       checkNewPage();
-      doc.setTextColor(34, 197, 94);
-      doc.text('✓', margin + 5, yPos);
-      doc.setTextColor(0, 0, 0);
-      doc.text(inspeccion, margin + 12, yPos);
-      yPos += 7;
+      const insWrapped = doc.splitTextToSize(forceBreakLongWords(inspeccion), maxWidth - 20);
+      insWrapped.forEach((line: string, i: number) => {
+        if (i === 0) {
+          doc.setTextColor(34, 197, 94);
+          doc.text('✓', margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+        }
+        doc.text(line, margin + 12, yPos);
+        yPos += 7;
+      });
     });
 
     if (orden.planCalidad.comparaRendimiento) {
