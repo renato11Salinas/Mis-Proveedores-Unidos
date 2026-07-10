@@ -306,6 +306,66 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
       .join(' ');
   };
 
+  // Helper for dynamic box rendering with text wrapping
+  const drawInfoBox = (fields: {label: string, value: string, isBadge?: boolean, badgeColor?: [number, number, number]}[], startY: number) => {
+    const validFields = fields.filter(f => f.value);
+    if (validFields.length === 0) return startY;
+    
+    const availWidth = maxWidth - 50;
+    let totalHeight = 5; // Top padding
+    
+    // Calculate heights
+    const processedFields = validFields.map(f => {
+      if (f.isBadge) {
+        return { ...f, lines: [f.value], height: 10 };
+      } else {
+        const lines = doc.splitTextToSize(f.value || '', availWidth);
+        const height = Math.max(7, lines.length * 6);
+        return { ...f, lines, height };
+      }
+    });
+    
+    processedFields.forEach(f => { totalHeight += f.height; });
+    totalHeight += 5; // Bottom padding
+    
+    if (checkNewPage(totalHeight + 10)) {
+      startY = margin;
+    }
+    
+    // Draw box
+    doc.setFillColor(252, 253, 255);
+    doc.rect(margin, startY, maxWidth, totalHeight, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.rect(margin, startY, maxWidth, totalHeight, 'S');
+    
+    // Draw text
+    let currentY = startY + 7;
+    processedFields.forEach(f => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(f.label, margin + 5, currentY);
+      doc.setFont('helvetica', 'normal');
+      
+      if (f.isBadge) {
+        doc.setFillColor(f.badgeColor![0], f.badgeColor![1], f.badgeColor![2]);
+        doc.roundedRect(margin + 45, currentY - 3.5, 30, 5, 1, 1, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(f.value.toUpperCase(), margin + 47, currentY + 0.5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+      } else {
+        f.lines.forEach((line: string, idx: number) => {
+          doc.text(line, margin + 45, currentY + (idx * 6));
+        });
+      }
+      currentY += f.height;
+    });
+    
+    return startY + totalHeight + 5;
+  };
+
   // Header with executive style
   doc.setFillColor(30, 58, 138); // Professional dark blue
   doc.rect(0, 0, pageWidth, 45, 'F');
@@ -337,48 +397,14 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
   doc.setFont('helvetica', 'normal');
 
   // Create a professional info box with grid layout
-  doc.setFillColor(252, 253, 255);
-  doc.rect(margin, yPos, maxWidth, 30, 'F');
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.rect(margin, yPos, maxWidth, 30, 'S');
-
-  yPos += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Componente:', margin + 5, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(orden.nombreComponente, margin + 45, yPos);
-
-  yPos += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Número de Guía:', margin + 5, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(orden.numeroGuia, margin + 45, yPos);
-
-  yPos += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Fecha Creación:', margin + 5, yPos);
-  doc.setFont('helvetica', 'normal');
-  doc.text(orden.fechaCreacion, margin + 45, yPos);
-
-  yPos += 7;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Estado:', margin + 5, yPos);
-  doc.setFont('helvetica', 'normal');
-  // Find step name
   const stepName = workflowSteps.find(s => s.id === orden.estado)?.name || orden.estado;
-
-  // Status badge style
-  doc.setFillColor(34, 197, 94);
-  doc.roundedRect(margin + 45, yPos - 3.5, 30, 5, 1, 1, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.text(stepName.toUpperCase(), margin + 47, yPos + 0.5);
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-
-  yPos += 10;
+  
+  yPos = drawInfoBox([
+    { label: 'Componente:', value: orden.nombreComponente },
+    { label: 'Número de Guía:', value: orden.numeroGuia },
+    { label: 'Fecha Creación:', value: orden.fechaCreacion },
+    { label: 'Estado:', value: stepName, isBadge: true, badgeColor: [34, 197, 94] }
+  ], yPos);
 
   // Cliente - Executive style
   if (orden.clienteNombre) {
@@ -392,63 +418,17 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
     yPos += 12;
 
     doc.setTextColor(0, 0, 0);
-    doc.setFillColor(252, 253, 255);
-    const lineCount = 1 + (orden.clienteRuc ? 1 : 0) + (orden.clienteTelefono ? 1 : 0) + (orden.clienteNumero ? 1 : 0) + (orden.dpObra ? 1 : 0) + (orden.edoObra ? 1 : 0);
-    const clienteBoxHeight = (lineCount * 7) + 5;
-    
-    doc.rect(margin, yPos, maxWidth, clienteBoxHeight, 'F');
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.3);
-    doc.rect(margin, yPos, maxWidth, clienteBoxHeight, 'S');
-
-    yPos += 7;
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.text('Cliente:', margin + 5, yPos);
     doc.setFont('helvetica', 'normal');
-    doc.text(orden.clienteNombre, margin + 45, yPos);
-    
-    if (orden.clienteRuc) {
-      yPos += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('RUC:', margin + 5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orden.clienteRuc, margin + 45, yPos);
-    }
-    
-    if (orden.clienteTelefono) {
-      yPos += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Teléfono:', margin + 5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orden.clienteTelefono, margin + 45, yPos);
-    }
 
-    if (orden.clienteNumero) {
-      yPos += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('N° Cliente:', margin + 5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orden.clienteNumero, margin + 45, yPos);
-    }
-    
-    if (orden.dpObra) {
-      yPos += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('DP de Obra:', margin + 5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orden.dpObra, margin + 45, yPos);
-    }
-    
-    if (orden.edoObra) {
-      yPos += 7;
-      doc.setFont('helvetica', 'bold');
-      doc.text('Estado de Obra:', margin + 5, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(orden.edoObra, margin + 45, yPos);
-    }
-    
-    yPos += 8;
+    yPos = drawInfoBox([
+      { label: 'Cliente:', value: orden.clienteNombre },
+      { label: 'RUC:', value: orden.clienteRuc || '' },
+      { label: 'Teléfono:', value: orden.clienteTelefono || '' },
+      { label: 'N° Cliente:', value: orden.clienteNumero || '' },
+      { label: 'DP de Obra:', value: orden.dpObra || '' },
+      { label: 'Estado de Obra:', value: orden.edoObra || '' }
+    ], yPos);
   }
 
   // Servicio Solicitado - Executive style
@@ -606,8 +586,19 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
         if (imageUrl) {
           const dataUrl = await getImageDataUrl(imageUrl);
           if (dataUrl) {
-            const imgWidth = 70;
-            const imgHeight = 52;
+            const props = doc.getImageProperties(dataUrl);
+            const ratio = props.width / props.height;
+            const maxImgWidth = 70;
+            const maxImgHeight = 52;
+            let imgWidth = maxImgWidth;
+            let imgHeight = maxImgHeight;
+            
+            if (ratio > (maxImgWidth / maxImgHeight)) {
+              imgHeight = maxImgWidth / ratio;
+            } else {
+              imgWidth = maxImgHeight * ratio;
+            }
+            
             doc.addImage(dataUrl, 'JPEG', margin + 5, yPos, imgWidth, imgHeight);
             yPos += imgHeight + 8;
           }
@@ -675,8 +666,19 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
         if (imageUrl) {
           const dataUrl = await getImageDataUrl(imageUrl);
           if (dataUrl) {
-            const imgWidth = 70;
-            const imgHeight = 52;
+            const props = doc.getImageProperties(dataUrl);
+            const ratio = props.width / props.height;
+            const maxImgWidth = 70;
+            const maxImgHeight = 52;
+            let imgWidth = maxImgWidth;
+            let imgHeight = maxImgHeight;
+            
+            if (ratio > (maxImgWidth / maxImgHeight)) {
+              imgHeight = maxImgWidth / ratio;
+            } else {
+              imgWidth = maxImgHeight * ratio;
+            }
+            
             doc.addImage(dataUrl, 'JPEG', margin + 5, yPos, imgWidth, imgHeight);
             yPos += imgHeight + 8;
           }
@@ -745,8 +747,19 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
         if (imageUrl) {
           const dataUrl = await getImageDataUrl(imageUrl);
           if (dataUrl) {
-            const imgWidth = 70;
-            const imgHeight = 52;
+            const props = doc.getImageProperties(dataUrl);
+            const ratio = props.width / props.height;
+            const maxImgWidth = 70;
+            const maxImgHeight = 52;
+            let imgWidth = maxImgWidth;
+            let imgHeight = maxImgHeight;
+            
+            if (ratio > (maxImgWidth / maxImgHeight)) {
+              imgHeight = maxImgWidth / ratio;
+            } else {
+              imgWidth = maxImgHeight * ratio;
+            }
+            
             doc.addImage(dataUrl, 'JPEG', margin + 5, yPos, imgWidth, imgHeight);
             yPos += imgHeight + 8;
           }

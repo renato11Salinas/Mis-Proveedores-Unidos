@@ -432,7 +432,8 @@ export function OrdenDetail() {
         window.open(documento.url, '_blank');
       } else if (documento.base64Data) {
         // Forma antigua (legacy): decodificar base64
-        const base64Data = documento.base64Data.split(',')[1] || documento.base64Data;
+        let base64Data = documento.base64Data.split(',')[1] || documento.base64Data;
+        base64Data = base64Data.replace(/\s/g, ''); // Limpiar caracteres inválidos
         const mimeType = documento.mimeType || 'application/pdf';
         
         const byteCharacters = atob(base64Data);
@@ -450,7 +451,9 @@ export function OrdenDetail() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        
+        // Retraso para evitar que algunos navegadores cancelen la descarga
+        setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       }
 
       toast.success(`Documento "${documento.nombre}" abierto correctamente`);
@@ -739,7 +742,7 @@ export function OrdenDetail() {
                             <ZoomableImage 
                               src={foto.url || foto.base64Data} 
                               alt={foto.nombre || `Foto ${index + 1}`}
-                              className="w-full aspect-square object-cover rounded-lg border block"
+                              className="w-full aspect-square object-contain bg-gray-50 rounded-lg border block"
                             />
                             <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                               <p className="truncate">{foto.nombre || `Foto ${index + 1}`}</p>
@@ -1082,7 +1085,7 @@ export function OrdenDetail() {
                             <ZoomableImage
                               src={foto.url || foto.base64Data}
                               alt={foto.nombre || `Foto ${index + 1}`}
-                              className="w-full aspect-square object-cover rounded-lg border block"
+                              className="w-full aspect-square object-contain bg-gray-50 rounded-lg border block"
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center pointer-events-none">
                               <p className="text-white text-sm font-semibold text-center px-2">
@@ -1184,7 +1187,7 @@ export function OrdenDetail() {
                               <ZoomableImage
                                 src={foto.url || foto.base64Data}
                                 alt={foto.nombre || `Foto ${index + 1}`}
-                                className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border-2 block"
+                                className="w-32 h-32 object-contain bg-gray-50 rounded-lg flex-shrink-0 border-2 block"
                               />
                               <div className="flex-1 space-y-2">
                                 {editingRevisionFotoIndex === index ? (
@@ -1281,7 +1284,7 @@ export function OrdenDetail() {
                               <ZoomableImage
                                 src={foto.url || foto.base64Data}
                                 alt={foto.nombre || `Foto ${index + 1}`}
-                                className="w-32 h-32 object-cover rounded-lg flex-shrink-0 border-2 block"
+                                className="w-32 h-32 object-contain bg-gray-50 rounded-lg flex-shrink-0 border-2 block"
                               />
                               <div className="flex-1 space-y-2">
                                 {editingLimpiezaFotoIndex === index ? (
