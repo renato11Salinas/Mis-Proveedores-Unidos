@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import { PDFDocument } from 'pdf-lib';
 import { workflowSteps } from '../data/mockData';
 
 export interface OrdenData {
@@ -995,15 +996,74 @@ export async function generateOrdenPDF(orden: OrdenData): Promise<void> {
 
   // Save PDF using custom blob approach to guarantee filename in all browsers
   try {
-    const pdfBlob = doc.output('blob');
+    const jsPdfOutput = doc.output('arraybuffer');
+    const finalPdf = await PDFDocument.load(jsPdfOutput);
+
+    // Adjuntar documentos adicionales al final
+    const adjuntos = [
+      { name: 'Orden de Servicio', data: orden.ordenServicio },
+      { name: 'Guía de Salida', data: orden.guiaSalida },
+      { name: 'Ficha del Componente', data: orden.fichaComponente },
+      { name: 'Informe Comercial', data: orden.informeComercial }
+    ].filter(d => d.data && (d.data.base64Data || d.data.url));
+
+    for (const adjunto of adjuntos) {
+      const fileData = adjunto.data.base64Data || adjunto.data.url;
+      if (!fileData) continue;
+      
+      try {
+        const mimeType = adjunto.data.mimeType || '';
+        const isPdf = mimeType.includes('pdf') || fileData.startsWith('data:application/pdf');
+        
+        let buffer: ArrayBuffer;
+        if (fileData.startsWith('http')) {
+          const response = await fetch(fileData);
+          buffer = await response.arrayBuffer();
+        } else {
+          let cleanData = fileData.replace(/\s/g, '');
+          if (!cleanData.startsWith('data:')) {
+            cleanData = `data:${mimeType || 'application/pdf'};base64,${cleanData}`;
+          }
+          const response = await fetch(cleanData);
+          buffer = await response.arrayBuffer();
+        }
+
+        if (isPdf) {
+          const attachedPdf = await PDFDocument.load(buffer);
+          const copiedPages = await finalPdf.copyPages(attachedPdf, attachedPdf.getPageIndices());
+          copiedPages.forEach((page) => finalPdf.addPage(page));
+        } else if (mimeType.includes('image') || fileData.startsWith('data:image')) {
+          let image;
+          if (mimeType.includes('png') || fileData.startsWith('data:image/png')) {
+            image = await finalPdf.embedPng(buffer);
+          } else {
+            image = await finalPdf.embedJpg(buffer);
+          }
+          
+          const { width, height } = image.scaleToFit(595.28 - 40, 841.89 - 40);
+          const page = finalPdf.addPage([595.28, 841.89]);
+          page.drawImage(image, {
+            x: 20,
+            y: 841.89 - 20 - height,
+            width,
+            height,
+          });
+        }
+      } catch (attachError) {
+        console.error(`Error adjuntando documento ${adjunto.name}:`, attachError);
+      }
+    }
+
+    const mergedPdfBytes = await finalPdf.save();
+    const pdfBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
     
     // Sanitize the OT number for the filename
     const safeOT = (orden.numeroOT || 'OT').replace(/[^a-zA-Z0-9-]/g, '_');
     const filename = `Informe_${safeOT}_${new Date().toISOString().split('T')[0]}.pdf`;
     
+    const link = document.createElement('a');
+    link.href = url;
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
