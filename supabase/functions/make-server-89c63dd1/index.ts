@@ -358,7 +358,7 @@ app.get('/make-server-89c63dd1/ordenes/next-correlative', async (c) => {
     console.log('Fetching next correlative number...');
     const existingOrdenes = await kv.getByPrefix('orden:');
 
-    let maxNumero = 0;
+    let maxNumero = 499; // Set base to 499 so next will be 500
     existingOrdenes.forEach(orden => {
       if (orden.numeroOTCorrelativo && typeof orden.numeroOTCorrelativo === 'number') {
         maxNumero = Math.max(maxNumero, orden.numeroOTCorrelativo);
@@ -411,7 +411,7 @@ app.post('/make-server-89c63dd1/ordenes', async (c) => {
       const existingOrdenes = await kv.getByPrefix('orden:');
 
       // Extract existing OT numbers and find the highest correlative number
-      let maxNumero = 0;
+      let maxNumero = 499; // Set base to 499 so next will be 500
       existingOrdenes.forEach(orden => {
         if (orden.numeroOTCorrelativo && typeof orden.numeroOTCorrelativo === 'number') {
           maxNumero = Math.max(maxNumero, orden.numeroOTCorrelativo);
