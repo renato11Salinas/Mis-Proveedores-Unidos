@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, X, Building2, User, ChevronDown } from 'lucide-react';
+import { Search, Plus, X, Building2, User, ChevronDown, Trash2 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../../../../utils/supabase/info';
 
 interface Cliente {
@@ -125,6 +125,42 @@ export function ClienteSelector({ value, onChange, onAddNew, required = false }:
     return `${cliente.nombre} ${cliente.apellido || ''}`.trim();
   };
 
+  const handleDelete = async (e: React.MouseEvent, cliente: Cliente) => {
+    e.stopPropagation();
+    
+    if (!window.confirm(`¿Está seguro de que desea eliminar al cliente "${getDisplayName(cliente)}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-89c63dd1/clientes/${cliente.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${publicAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al eliminar cliente');
+      }
+
+      if (selectedCliente?.id === cliente.id) {
+        setSelectedCliente(null);
+        onChange(null);
+      }
+      
+      loadClientes();
+    } catch (error) {
+      console.error('Error deleting cliente:', error);
+      alert('Hubo un error al eliminar el cliente.');
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -215,27 +251,36 @@ export function ClienteSelector({ value, onChange, onAddNew, required = false }:
               </div>
             ) : (
               filteredClientes.map((cliente) => (
-                <button
+                <div
                   key={cliente.id}
                   onClick={() => handleSelect(cliente)}
-                  className={`w-full px-3 py-2.5 flex items-start gap-2 hover:bg-gray-50 transition-colors text-left ${
+                  className={`w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors text-left cursor-pointer group ${
                     selectedCliente?.id === cliente.id ? 'bg-blue-50' : ''
                   }`}
                 >
-                  {cliente.cliente_tipo === 'empresa' ? (
-                    <Building2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <User className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{getDisplayName(cliente)}</div>
-                    <div className="text-xs text-gray-500 space-y-0.5">
-                      {cliente.ruc && <div>RUC: {cliente.ruc}</div>}
-                      {cliente.email && <div>{cliente.email}</div>}
-                      {cliente.telefono && <div>{cliente.telefono}</div>}
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
+                    {cliente.cliente_tipo === 'empresa' ? (
+                      <Building2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <User className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{getDisplayName(cliente)}</div>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        {cliente.ruc && <div>RUC: {cliente.ruc}</div>}
+                        {cliente.email && <div>{cliente.email}</div>}
+                        {cliente.telefono && <div>{cliente.telefono}</div>}
+                      </div>
                     </div>
                   </div>
-                </button>
+                  <button
+                    onClick={(e) => handleDelete(e, cliente)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 focus:opacity-100"
+                    title="Eliminar cliente"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))
             )}
           </div>
