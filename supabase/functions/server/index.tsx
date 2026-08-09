@@ -587,6 +587,69 @@ app.post('/make-server-89c63dd1/ordenes/:id/agregar-componente', async (c) => {
   }
 });
 
+// Delete a single component (sibling orden) from a multi-order group.
+app.delete('/make-server-89c63dd1/ordenes/:id/componente', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const orden = await kv.get(`orden:${id}`);
+    if (!orden) {
+      return c.json({ error: 'Orden not found' }, 404);
+    }
+    if (!orden.esOrdenMultiple) {
+      return c.json({
+        error: 'Esta OT no es parte de un grupo de componentes. Use "Anular OT" en su lugar.'
+      }, 400);
+    }
+
+    const correlativo = orden.numeroOTCorrelativo;
+
+    const supabase = getSupabaseClient();
+    const { error: deleteError } = await supabase
+      .from('kv_store_89c63dd1')
+      .delete()
+      .eq('key', `orden:${id}`);
+    if (deleteError) {
+      throw new Error(`Failed to delete orden: ${deleteError.message}`);
+    }
+
+    try {
+      const bucketName = 'make-89c63dd1-photos';
+      const folders = ['ot', 'pieza', 'limpiezaEmbalaje', 'revisionCalidad'];
+      for (const folder of folders) {
+        const { data: files } = await supabase.storage
+          .from(bucketName)
+          .list(`${id}/${folder}`);
+        if (files && files.length > 0) {
+          const paths = files.map((f: any) => `${id}/${folder}/${f.name}`);
+          await supabase.storage.from(bucketName).remove(paths);
+        }
+      }
+    } catch (storageErr) {
+      console.log(`Storage cleanup warning (non-fatal): ${storageErr}`);
+    }
+
+    if (correlativo) {
+      const allOrdenes = await kv.getByPrefix('orden:');
+      const remaining = allOrdenes.filter(o => o.numeroOTCorrelativo === correlativo);
+      const newTotal = remaining.length;
+      for (const s of remaining) {
+        const updated = { ...s, ordenMultipleTotal: newTotal };
+        await setKV(`orden:${s.id}`, updated);
+      }
+    }
+
+    invalidateOrdenesCache();
+
+    console.log(`Deleted componente ${orden.numeroOT} (id ${id}) from group ${correlativo}`);
+
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error(`Error deleting componente: ${error}`);
+    console.error(`Error stack: ${error.stack}`);
+    return c.json({ error: `Error deleting componente: ${error.message || error}` }, 500);
+  }
+});
+
 app.patch('/make-server-89c63dd1/ordenes/:id/avanzar', async (c) => {
   try {
     console.log('Advancing orden state - parsing request...');

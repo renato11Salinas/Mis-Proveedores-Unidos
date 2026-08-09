@@ -70,6 +70,27 @@ export function OrdenDetail() {
   const [showAgregarComponenteDialog, setShowAgregarComponenteDialog] = useState(false);
   const [nuevoComponenteNombre, setNuevoComponenteNombre] = useState('');
   const [isAgregandoComponente, setIsAgregandoComponente] = useState(false);
+  const [showEliminarComponenteDialog, setShowEliminarComponenteDialog] = useState(false);
+  const [isEliminandoComponente, setIsEliminandoComponente] = useState(false);
+
+  const handleEliminarComponente = async () => {
+    try {
+      setIsEliminandoComponente(true);
+      const response = await api.eliminarComponente(id!);
+      if (response.error) {
+        toast.error(`Error al eliminar componente: ${response.error}`);
+      } else {
+        toast.success('Componente eliminado');
+        setShowEliminarComponenteDialog(false);
+        navigate('/');
+      }
+    } catch (error) {
+      toast.error('Error al eliminar componente');
+      console.error('Error eliminando componente:', error);
+    } finally {
+      setIsEliminandoComponente(false);
+    }
+  };
 
   const handleAgregarComponente = async () => {
     const nombre = nuevoComponenteNombre.trim();
@@ -602,6 +623,17 @@ export function OrdenDetail() {
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Agregar componente
+                </Button>
+              )}
+              {!isAnulada && orden.estado !== 'completado' && orden.esOrdenMultiple && (
+                <Button
+                  onClick={() => setShowEliminarComponenteDialog(true)}
+                  size="lg"
+                  variant="outline"
+                  className="text-red-600 border-red-300 hover:bg-red-50 w-full sm:w-auto"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Eliminar componente
                 </Button>
               )}
               {!isAnulada && orden.estado !== 'completado' && (
@@ -1629,6 +1661,29 @@ export function OrdenDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={showEliminarComponenteDialog} onOpenChange={setShowEliminarComponenteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este componente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará <strong>{orden.numeroOT}</strong> ({orden.nombreComponente}) del grupo de componentes.
+              Las OT hermanas del mismo número correlativo NO se verán afectadas.
+              Esta acción es irreversible: se borrarán también las fotos y archivos asociados a este componente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isEliminandoComponente}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEliminarComponente}
+              disabled={isEliminandoComponente}
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+            >
+              {isEliminandoComponente ? 'Eliminando…' : 'Eliminar componente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showAnularDialog} onOpenChange={setShowAnularDialog}>
         <AlertDialogContent>

@@ -100,6 +100,17 @@ export const api = {
     return response.json();
   },
 
+  async eliminarComponente(ordenId: string) {
+    const response = await fetch(`${API_URL}/ordenes/${ordenId}/componente`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${publicAnonKey}`,
+      },
+    });
+    this.invalidateCache();
+    return response.json();
+  },
+
   async updateOrden(id: string, updates: any) {
     const response = await fetch(`${API_URL}/ordenes/${id}`, {
       method: 'PATCH',
