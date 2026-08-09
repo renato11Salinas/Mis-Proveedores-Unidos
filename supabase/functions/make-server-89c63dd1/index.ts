@@ -475,6 +475,126 @@ app.post('/make-server-89c63dd1/ordenes', async (c) => {
   }
 });
 
+// Add a new component (sibling orden) to an existing orden's group.
+// The new orden shares numeroOTCorrelativo with the source and gets the next
+// available letter suffix (A, B, C, ...). If the source was a single orden
+// (no suffix), it is promoted into the multiple-order group as index 0 with
+// suffix A, and the new one takes B.
+app.post('/make-server-89c63dd1/ordenes/:id/agregar-componente', async (c) => {
+  try {
+    const sourceId = c.req.param('id');
+    const { nombreComponente } = await c.req.json();
+
+    if (!nombreComponente || typeof nombreComponente !== 'string' || !nombreComponente.trim()) {
+      return c.json({ error: 'nombreComponente is required' }, 400);
+    }
+
+    const source = await kv.get(`orden:${sourceId}`);
+    if (!source) {
+      return c.json({ error: 'Orden not found' }, 404);
+    }
+    if (!source.numeroOTCorrelativo) {
+      return c.json({ error: 'La orden fuente no tiene número correlativo' }, 400);
+    }
+
+    const correlativo = source.numeroOTCorrelativo;
+
+    // Find sibling ordenes in the same correlative group
+    const allOrdenes = await kv.getByPrefix('orden:');
+    const siblings = allOrdenes.filter(o => o.numeroOTCorrelativo === correlativo);
+
+    // Compute which suffix indices are already used
+    const usedIndices = new Set<number>();
+    for (const s of siblings) {
+      if (s.esOrdenMultiple && typeof s.ordenMultipleIndice === 'number') {
+        usedIndices.add(s.ordenMultipleIndice);
+      }
+    }
+
+    // If the source is a single orden (no suffix yet), promote it to index 0
+    // and rename its OT to add the "A" suffix.
+    const promotedIds: string[] = [];
+    if (!source.esOrdenMultiple) {
+      usedIndices.add(0);
+      promotedIds.push(source.id);
+    }
+
+    // Pick the smallest free index for the new component
+    let newIndex = 0;
+    while (usedIndices.has(newIndex)) newIndex++;
+    if (newIndex > 25) {
+      return c.json({ error: 'Se alcanzó el máximo de componentes (26) para esta OT' }, 400);
+    }
+
+    const newTotal = Math.max(siblings.length + 1, newIndex + 1);
+    const correlativoStr = String(correlativo).padStart(4, '0');
+    const newSuffix = String.fromCharCode(65 + newIndex);
+    const newNumeroOT = `OT-${correlativoStr}${newSuffix}`;
+
+    // Update siblings so their ordenMultipleTotal reflects the new group size,
+    // and promote the source if it was a single orden.
+    for (const s of siblings) {
+      const wasPromoted = promotedIds.includes(s.id);
+      const updated = {
+        ...s,
+        esOrdenMultiple: true,
+        ordenMultipleTotal: newTotal,
+        ordenMultipleIndice: wasPromoted ? 0 : s.ordenMultipleIndice,
+        numeroOT: wasPromoted ? `OT-${correlativoStr}A` : s.numeroOT,
+      };
+      await setKV(`orden:${s.id}`, updated);
+    }
+
+    // Fields inherited from the source (arribo shared data)
+    const inheritedFields = {
+      clienteId: source.clienteId,
+      clienteNombre: source.clienteNombre,
+      clienteRuc: source.clienteRuc,
+      clienteEmail: source.clienteEmail,
+      clienteTelefono: source.clienteTelefono,
+      numeroGuia: source.numeroGuia,
+      servicioSolicitado: source.servicioSolicitado,
+      dpObra: source.dpObra || '',
+      clienteNumero: source.clienteNumero || '',
+      compraAlta: source.compraAlta || '',
+      edoObra: source.edoObra || '',
+      exObra: source.exObra || '',
+      requiereFotografia: false,
+    };
+
+    const newId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newOrden = {
+      ...inheritedFields,
+      id: newId,
+      numeroOT: newNumeroOT,
+      numeroOTCorrelativo: correlativo,
+      nombreComponente: nombreComponente.trim(),
+      esOrdenMultiple: true,
+      ordenMultipleIndice: newIndex,
+      ordenMultipleTotal: newTotal,
+      fechaCreacion: new Date().toISOString(),
+      estado: 'arribo',
+      historialCambios: [],
+      fotografiasIncluyeOT: [],
+      fotografiasPiezas: [],
+      tareasRealizar: [],
+      zonasTrabajar: [],
+      inspeccionFinalResponsables: [],
+    };
+
+    await setKV(`orden:${newId}`, newOrden);
+    invalidateOrdenesCache();
+
+    console.log(`Added new component ${newNumeroOT} to group ${correlativoStr} (index ${newIndex}, total ${newTotal})`);
+
+    return c.json({ orden: newOrden });
+  } catch (error) {
+    console.error(`Error adding component: ${error}`);
+    console.error(`Error stack: ${error.stack}`);
+    return c.json({ error: `Error adding component: ${error.message || error}` }, 500);
+  }
+});
+
 app.patch('/make-server-89c63dd1/ordenes/:id/avanzar', async (c) => {
   try {
     console.log('Advancing orden state - parsing request...');

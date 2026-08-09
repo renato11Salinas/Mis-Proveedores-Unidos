@@ -87,6 +87,19 @@ export const api = {
     return response.json();
   },
 
+  async agregarComponente(ordenId: string, nombreComponente: string) {
+    const response = await fetch(`${API_URL}/ordenes/${ordenId}/agregar-componente`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${publicAnonKey}`,
+      },
+      body: JSON.stringify({ nombreComponente }),
+    });
+    this.invalidateCache();
+    return response.json();
+  },
+
   async updateOrden(id: string, updates: any) {
     const response = await fetch(`${API_URL}/ordenes/${id}`, {
       method: 'PATCH',

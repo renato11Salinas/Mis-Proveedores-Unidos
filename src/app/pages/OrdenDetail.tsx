@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { ArrowLeft, Camera, CheckCircle, FileText, Download, Undo2, Upload, AlertCircle, X, Trash2, Ban } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle, FileText, Download, Undo2, Upload, AlertCircle, X, Trash2, Ban, Plus } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -17,6 +17,14 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { workflowSteps } from '../data/mockData';
 import { WorkflowProgress } from '../components/workflow/WorkflowProgress';
 import { ConfirmarAvanceDialog } from '../components/workflow/ConfirmarAvanceDialog';
@@ -59,6 +67,36 @@ export function OrdenDetail() {
   const [editingLimpiezaFotoNombre, setEditingLimpiezaFotoNombre] = useState<string>('');
 
   const [showAnularDialog, setShowAnularDialog] = useState(false);
+  const [showAgregarComponenteDialog, setShowAgregarComponenteDialog] = useState(false);
+  const [nuevoComponenteNombre, setNuevoComponenteNombre] = useState('');
+  const [isAgregandoComponente, setIsAgregandoComponente] = useState(false);
+
+  const handleAgregarComponente = async () => {
+    const nombre = nuevoComponenteNombre.trim();
+    if (!nombre) {
+      toast.error('Ingrese el nombre del componente');
+      return;
+    }
+    try {
+      setIsAgregandoComponente(true);
+      const response = await api.agregarComponente(id!, nombre);
+      if (response.error) {
+        toast.error(`Error al agregar componente: ${response.error}`);
+      } else if (response.orden) {
+        toast.success(`Componente agregado como ${response.orden.numeroOT}`);
+        setShowAgregarComponenteDialog(false);
+        setNuevoComponenteNombre('');
+        navigate(`/orden/${response.orden.id}`);
+      } else {
+        toast.error('Respuesta inesperada al agregar componente');
+      }
+    } catch (error) {
+      toast.error('Error al agregar componente');
+      console.error('Error agregando componente:', error);
+    } finally {
+      setIsAgregandoComponente(false);
+    }
+  };
 
   const handleAnularOT = async () => {
     try {
@@ -552,6 +590,20 @@ export function OrdenDetail() {
             
 
             <div className="mt-6 flex flex-col-reverse sm:flex-row justify-end gap-3">
+              {!isAnulada && orden.estado !== 'completado' && (
+                <Button
+                  onClick={() => {
+                    setNuevoComponenteNombre('');
+                    setShowAgregarComponenteDialog(true);
+                  }}
+                  size="lg"
+                  variant="outline"
+                  className="text-blue-600 border-blue-600 hover:bg-blue-50 w-full sm:w-auto"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar componente
+                </Button>
+              )}
               {!isAnulada && orden.estado !== 'completado' && (
                 <Button onClick={() => setShowAnularDialog(true)} size="lg" variant="outline" className="text-gray-600 border-gray-300 hover:bg-gray-100 w-full sm:w-auto">
                   <Ban className="w-4 h-4 mr-2" />
@@ -1538,6 +1590,46 @@ export function OrdenDetail() {
           onConfirm={handleRetrocederEtapa}
         />
       )}
+      <Dialog open={showAgregarComponenteDialog} onOpenChange={setShowAgregarComponenteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar componente a esta OT</DialogTitle>
+            <DialogDescription>
+              Se creará una orden hermana con el mismo número correlativo y el siguiente sufijo (A, B, C…). Los datos del cliente y guía se heredarán de esta orden.
+              {!orden.esOrdenMultiple && (
+                <span className="block mt-2 text-amber-700">
+                  Nota: Esta OT ({orden.numeroOT}) se renombrará como {orden.numeroOT}A al pasar a ser parte de un grupo múltiple.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="nuevoComponenteNombre">Nombre del componente</Label>
+            <Input
+              id="nuevoComponenteNombre"
+              value={nuevoComponenteNombre}
+              onChange={(e) => setNuevoComponenteNombre(e.target.value)}
+              placeholder="Ej: Motor eléctrico 15HP"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isAgregandoComponente) {
+                  e.preventDefault();
+                  handleAgregarComponente();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAgregarComponenteDialog(false)} disabled={isAgregandoComponente}>
+              Cancelar
+            </Button>
+            <Button onClick={handleAgregarComponente} disabled={isAgregandoComponente} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {isAgregandoComponente ? 'Agregando…' : 'Agregar componente'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={showAnularDialog} onOpenChange={setShowAnularDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
